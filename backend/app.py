@@ -1,70 +1,106 @@
 import os
 from typing import Optional, List
-
 from fastapi import FastAPI, Body, HTTPException, status
 from fastapi.responses import Response
-from pydantic import ConfigDict, BaseModel, Field, EmailStr
+from pydantic import ConfigDict, BaseModel, Field
 from pydantic.functional_validators import BeforeValidator
 from typing_extensions import Annotated
-
 from bson import ObjectId
-import asyncio
-from pymongo import AsyncMongoClient
-from pymongo import ReturnDocument
+from pymongo import AsyncMongoClient, ReturnDocument
+from fastapi.middleware.cors import CORSMiddleware
 
 # ------------------------------------------------------------------------ #
-#                         Inicialització de l'aplicació                    #
+#                          Inicialització de l'aplicació                   #
 # ------------------------------------------------------------------------ #
-# Creació de la instància FastAPI amb informació bàsica de l'API
 app = FastAPI(
-    title="Student Course API",
-    summary="Exemple d'API REST amb FastAPI i MongoDB per gestionar informació d'estudiants",
+    title="Gestor de Tasques API",
+    summary="API REST per gestionar tasques amb MongoDB",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # ------------------------------------------------------------------------ #
-#                   Configuració de la connexió amb MongoDB                #
+#                    Configuració de la connexió amb MongoDB               #
 # ------------------------------------------------------------------------ #
-# Creem el client de MongoDB utilitzant la URL de connexió emmagatzemada
-# a les variables d'entorn. Això evita incloure credencials dins del codi.
 client = AsyncMongoClient(os.environ["MONGODB_URL"])
-
-# Selecció de la base de dades i de la col·lecció
 db = client.college
-student_collection = db.get_collection("students")
+task_collection = db.get_collection("tasques")
 
-# Els documents de MongoDB tenen `_id` de tipus ObjectId.
-# Aquí definim PyObjectId com un string serialitzable per JSON,
-# que serà utilitzat als models Pydantic.
 PyObjectId = Annotated[str, BeforeValidator(str)]
 
 # ------------------------------------------------------------------------ #
-#                            Definició dels models                         #
+#                             Definició dels models                        #
 # ------------------------------------------------------------------------ #
-class StudentModel(BaseModel):
+class GestorTasquesModel(BaseModel):
     """
-    Model que representa un estudiant.
-    Conté tots els camps obligatoris i opcional `_id`.
+    Model que representa una tasca.
     """
-    # Clau primària de l'estudiant. 
-    # MongoDB utilitza `_id`, però l'API exposa aquest camp com `id`.
     id: Optional[PyObjectId] = Field(alias="_id", default=None)
-    
-    # Camps obligatoris de l'estudiant
-    name: str = Field(...)
-    email: EmailStr = Field(...)
-    course: str = Field(...)
-    gpa: float = Field(..., le=4.0)
+    titol: str = Field(...)
+    descripcio: str = Field(...)
+    estat: str = Field(default="pendent")
+    prioritat: int = Field(..., ge=1, le=5)
+    categoria: str = Field(...)
+    persona_assignada: str = Field(...)
 
-    # Configuració addicional del model Pydantic
     model_config = ConfigDict(
-        populate_by_name=True,  # Permet utilitzar alias al serialitzar/deserialitzar
-        arbitrary_types_allowed=True,  # Permet tipus personalitzats com ObjectId
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
         json_schema_extra={
             "example": {
-                "name": "Jane Doe",
-                "email": "jdoe@example.com",
-                "course": "Experiments, Science, and Fashion in Nanophotonics",
-                "gpa": 3.0,
+                "titol": "Exemple de tasca",
+                "descripcio": "Descripció detallada",
+                "estat": "pendent",
+                "prioritat": 3,
+                "categoria": "General",
+                "persona_assignada": "Cristian"
             }
         },
     )
+
+# ------------------------------------------------------------------------ #
+#                               Endpoints CRUD                             #
+# ------------------------------------------------------------------------ #
+
+@app.post("/tasks/", response_model=GestorTasquesModel, status_code=status.HTTP_201_CREATED)
+async def create_task(task: GestorTasquesModel = Body(...)):
+    new_task = await task_collection.insert_one(
+        task.model_dump(by_alias=True, exclude={"id"})
+    )
+    created_task = await task_collection.find_one({"_id": new_task.inserted_id})
+    return created_task
+
+@app.get("/tasks/", response_model=List[GestorTasquesModel])
+async def list_tasks():
+    return await task_collection.find().to_list(1000)
+
+@app.get("/tasks/{id}", response_model=GestorTasquesModel)
+async def show_task(id: str):
+    if (task := await task_collection.find_one({"_id": ObjectId(id)})) is not None:
+        return task
+    raise HTTPException(status_code=404, detail=f"Tasca {id} no trobada")
+
+@app.put("/tasks/{id}", response_model=GestorTasquesModel)
+async def update_task(id: str, task: GestorTasquesModel = Body(...)):
+    update_data = {k: v for k, v in task.model_dump(by_alias=True).items() if k != "_id"}
+    updated_task = await task_collection.find_one_and_update(
+        {"_id": ObjectId(id)},
+        {"$set": update_data},
+        return_document=ReturnDocument.AFTER,
+    )
+    if updated_task:
+        return updated_task
+    raise HTTPException(status_code=404, detail=f"Tasca {id} no trobada")
+
+@app.delete("/tasks/{id}")
+async def delete_task(id: str):
+    delete_result = await task_collection.delete_one({"_id": ObjectId(id)})
+    if delete_result.deleted_count == 1:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    raise HTTPException(status_code=404, detail=f"Tasca {id} no trobada")
