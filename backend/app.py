@@ -28,7 +28,7 @@ app.add_middleware(
 # ------------------------------------------------------------------------ #
 #                    Configuració de la connexió amb MongoDB               #
 # ------------------------------------------------------------------------ #
-client = AsyncMongoClient(os.environ["MONGODB_URL"])
+client = AsyncMongoClient("mongodb+srv://cristianchanclon_db_user:1234@cluster0.n42t6zw.mongodb.net/college?retryWrites=true&w=majority&appName=Cluster0")
 db = client.college
 task_collection = db.get_collection("tasques")
 
