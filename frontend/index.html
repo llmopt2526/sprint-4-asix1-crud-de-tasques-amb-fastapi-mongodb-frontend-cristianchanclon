@@ -1,9 +1,69 @@
-<!doctype html>
-<html>
-  <head>
-    <title>This is the title of the webpage!</title>
-  </head>
-  <body>
-    <p>This is an example paragraph. Anything in the <strong>body</strong> tag will appear on the page, just like this <strong>p</strong> tag and its contents.</p>
-  </body>
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+    <meta charset="UTF-8">
+    <title>Gestor de Tasques - Cristian</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/skeleton/2.0.4/skeleton.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h2> Gestor de Tasques</h2>
+        
+        <form id="task-form">
+            <div class="row">
+                <div class="six columns">
+                    <label for="titol">Titol de la tasca</label>
+                    <input class="u-full-width" type="text" id="titol" required>
+                </div>
+                <div class="six columns">
+                    <label for="persona">Persona assignada</label>
+                    <input class="u-full-width" type="text" id="persona" required>
+                </div>
+            </div>
+            
+            <label for="descripcio">Descripció</label>
+            <textarea class="u-full-width" id="descripcio"></textarea>
+            
+            <div class="row">
+                <div class="four columns">
+                    <label for="prioritat">Prioritat (1-5)</label>
+                    <input class="u-full-width" type="number" id="prioritat" min="1" max="5" value="3">
+                </div>
+                <div class="four columns">
+                    <label for="categoria">Categoria</label>
+                    <select class="u-full-width" id="categoria">
+                        <option value="Estudis">Estudis</option>
+                        <option value="Feina">Feina</option>
+                        <option value="Personal">Personal</option>
+                    </select>
+                </div>
+                <div class="four columns">
+                    <label for="estat">Estat</label>
+                    <select class="u-full-width" id="estat">
+                        <option value="pendent">Pendent</option>
+                        <option value="feta">Feta</option>
+                    </select>
+                </div>
+            </div>
+            
+            <button class="button-primary u-full-width" type="submit">Afegir Tasca</button>
+        </form>
+
+        <hr>
+        <table class="u-full-width">
+            <thead>
+                <tr>
+                    <th>Tasca</th>
+                    <th>Estat</th>
+                    <th>Prioritat</th>
+                    <th>Persona</th>
+                    <th>Accions</th>
+                </tr>
+            </thead>
+            <tbody id="tasks-list"></tbody>
+        </table>
+    </div>
+    <script src="./javascript.js"></script>
+</body>
 </html>
