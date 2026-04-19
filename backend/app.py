@@ -86,17 +86,18 @@ async def show_task(id: str):
         return task
     raise HTTPException(status_code=404, detail=f"Tasca {id} no trobada")
 
-@app.put("/tasks/{id}", response_model=GestorTasquesModel)
-async def update_task(id: str, task: GestorTasquesModel = Body(...)):
-    update_data = {k: v for k, v in task.model_dump(by_alias=True).items() if k != "_id"}
-    updated_task = await task_collection.find_one_and_update(
-        {"_id": ObjectId(id)},
-        {"$set": update_data},
-        return_document=ReturnDocument.AFTER,
+from fastapi import Body
+
+@app.put("/tasks/{task_id}")
+async def update_task(task_id: str, payload: dict = Body(...)):
+    # Añadimos 'await' antes de db.tasks...
+    result = await db.tasks.update_one(
+        {"_id": ObjectId(task_id)},
+        {"$set": payload}
     )
-    if updated_task:
-        return updated_task
-    raise HTTPException(status_code=404, detail=f"Tasca {id} no trobada")
+    if result.matched_count == 0:
+        return {"message": "No se encontró la tarea"}
+    return {"message": "Tarea actualizada correctamente"}
 
 @app.delete("/tasks/{id}")
 async def delete_task(id: str):
