@@ -3,7 +3,7 @@
 Aquest fitxer és el cervell. Fes servir Body per rebre actualitzacions i await per assegurar que MongoDB guardi els canvis abans de respondre.
 
 
-4. import os
+import os
 from typing import Optional, List
 from fastapi import FastAPI, Body, HTTPException, status
 from fastapi.responses import Response
