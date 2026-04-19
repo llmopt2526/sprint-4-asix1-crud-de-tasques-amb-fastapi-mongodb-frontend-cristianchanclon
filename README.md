@@ -1,36 +1,9 @@
-[![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/ULL36zWV)
-### Estructura del projecte
+1. Backend app.py
 
-A diferència d’altres projectes més complexos, en aquest cas **treballareu amb una estructura simple**, igual que a l’exemple oficial. Tot el backend s’ubica en un únic fitxer (`app.py`), amb l’objectiu de centrar-se en **aprendre CRUD amb FastAPI i MongoDB** abans de **modularitzar el codi**.
+Aquest fitxer és el cervell. Fes servir Body per rebre actualitzacions i await per assegurar que MongoDB guardi els canvis abans de respondre.
 
-El projecte ha de mantenir una **estructura com aquesta**:
 
-```
-project/
-├── README.md
-├── backend/                # FastAPI + MongoDB
-│   ├── app.py              # Fitxer principal (tota la lògica)
-│   └── requirements.txt    # Dependències
-│
-├── frontend/           # Interfície web
-│   ├── index.html
-│   ├── style.css
-│   └── app.js
-│
-└── tests/              # Tests amb Postman
-    └── Postman_API_tests.json
-```
-#### Fitxer `app.py`
-
-En projectes més complexos, es separaria, per exemple, la connexió a MongoDB en un fitxer a banda, anomenat `database.py`; i, els models, en `models.py`.
-En el nostre cas, tot el backend l'implementarem dins del fitxer `app.py` per simplificar.
-
-Tot i això, és **molt recomanable**:
-- Afegir **grans comentaris per separar lògica** de connexió, models i endpoints.
-- **Documentar clarament cada secció** per facilitar la lectura i localització d’errors.
-
-```python
-import os
+4. import os
 from typing import Optional, List
 from fastapi import FastAPI, Body, HTTPException, status
 from fastapi.responses import Response
@@ -118,17 +91,18 @@ async def show_task(id: str):
         return task
     raise HTTPException(status_code=404, detail=f"Tasca {id} no trobada")
 
-@app.put("/tasks/{id}", response_model=GestorTasquesModel)
-async def update_task(id: str, task: GestorTasquesModel = Body(...)):
-    update_data = {k: v for k, v in task.model_dump(by_alias=True).items() if k != "_id"}
-    updated_task = await task_collection.find_one_and_update(
-        {"_id": ObjectId(id)},
-        {"$set": update_data},
-        return_document=ReturnDocument.AFTER,
+from fastapi import Body
+
+@app.put("/tasks/{task_id}")
+async def update_task(task_id: str, payload: dict = Body(...)):
+    # Añadimos 'await' antes de db.tasks...
+    result = await db.tasks.update_one(
+        {"_id": ObjectId(task_id)},
+        {"$set": payload}
     )
-    if updated_task:
-        return updated_task
-    raise HTTPException(status_code=404, detail=f"Tasca {id} no trobada")
+    if result.matched_count == 0:
+        return {"message": "No se encontró la tarea"}
+    return {"message": "Tarea actualizada correctamente"}
 
 @app.delete("/tasks/{id}")
 async def delete_task(id: str):
@@ -137,3 +111,116 @@ async def delete_task(id: str):
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     raise HTTPException(status_code=404, detail=f"Tasca {id} no trobada")
 
+
+
+    
+
+2. Frontend tenim javascript.js
+
+Aquest arxiu és essencial ja que és el que s'encarrega de poder manejar ja web
+
+   const API_URL = "http://127.0.0.1:8000/tasks/";
+
+// Función para obtener y mostrar las tareas
+async function getTasks() {
+    try {
+        const response = await fetch(API_URL);
+        const tasks = await response.json();
+        const list = document.getElementById('tasks-list');
+        list.innerHTML = ''; 
+
+        tasks.forEach(task => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td><strong>${task.titol}</strong><br><small>${task.descripcio || ''}</small></td>
+                <td>${task.estat}</td>
+                <td>${task.prioritat}</td>
+                <td>${task.persona_assignada}</td>
+                <td>
+                    <button class="button" onclick="updateTask('${task._id}', 'finalizado')" 
+                        style="color: green; border-color: green; margin-right: 5px;">Fet</button>
+                    
+                    <button class="button" onclick="deleteTask('${task._id}')" 
+                        style="color: red; border-color: red;">Eliminar</button>
+                </td>
+            `;
+            list.appendChild(row);
+        });
+    } catch (error) {
+        console.error("Error carregant tasques:", error);
+    }
+}
+
+// Función para crear una nueva tarea (POST)
+document.getElementById('task-form').onsubmit = async (e) => {
+    e.preventDefault();
+    
+    const newTask = {
+        titol: document.getElementById('titol').value,
+        descripcio: document.getElementById('descripcio').value,
+        persona_assignada: document.getElementById('persona').value,
+        prioritat: parseInt(document.getElementById('prioritat').value),
+        categoria: document.getElementById('categoria').value,
+        estat: document.getElementById('estat').value
+    };
+
+    await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newTask)
+    });
+
+    document.getElementById('task-form').reset();
+    getTasks(); 
+};
+
+// Función para eliminar (DELETE)
+async function deleteTask(id) {
+    if (confirm('Segur que vols eliminar aquesta tasca?')) {
+        await fetch(`${API_URL}${id}`, { method: 'DELETE' });
+        getTasks();
+    }
+}
+
+// Función para actualizar el estado (PUT)
+async function updateTask(id, nuevoEstado) {
+    try {
+        const response = await fetch(`${API_URL}${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ estat: nuevoEstado })
+        });
+
+        if (response.ok) {
+            // Esto es lo más importante: 
+            // Vaciamos la lista y volvemos a llamar a getTasks()
+            console.log("Actualizado con éxito");
+            await getTasks(); 
+        }
+    } catch (error) {
+        console.error("Error en el PUT:", error);
+    }
+}
+
+// Carga inicial al abrir la página
+getTasks();
+
+3. Comandes d'Execució
+
+Perquè tot funcioni utilitzarem l'ordre uvicorn app:app --reload perquè la nostra fast api funcioni.
+<img width="928" height="253" alt="image" src="https://github.com/user-attachments/assets/88bfcb65-ef76-4612-8512-3c8d7cbe9e53" />
+
+el següent que farem serà obrir la nostra pàgina per fer el funcionament
+
+<img width="886" height="762" alt="image" src="https://github.com/user-attachments/assets/4d898703-961b-4f2b-bc4e-7d1be9aa4ffb" />
+
+i posarem unes dades per comprovar-ne el funcionament
+<img width="834" height="746" alt="image" src="https://github.com/user-attachments/assets/7ce2f9ac-1cd7-4be3-b7d9-2d36d0c1aa7e" />
+
+<img width="715" height="60" alt="image" src="https://github.com/user-attachments/assets/7c3b8422-07d3-40e5-b4b8-4aa3bd6926a8" />
+
+i si volem eliminar-lo de donarem a eliminar i llest
+<img width="1853" height="1010" alt="image" src="https://github.com/user-attachments/assets/83ca1547-594c-4c23-b7d8-e195fd222872" />
+
+ara provarem de fer un get en postman per comprovar-ne el funcionament
+<img width="1067" height="681" alt="image" src="https://github.com/user-attachments/assets/a16b17ea-8479-40f0-84a0-a1e019711f67" />
