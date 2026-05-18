@@ -28,7 +28,9 @@ app.add_middleware(
 # ------------------------------------------------------------------------ #
 #                    Configuració de la connexió amb MongoDB               #
 # ------------------------------------------------------------------------ #
-client = AsyncMongoClient("mongodb+srv://cristianchanclon_db_user:1234@cluster0.n42t6zw.mongodb.net/college?retryWrites=true&w=majority&appName=Cluster0")
+MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://cristianchanclon_db_user:1234@cluster0.n42t6zw.mongodb.net/college?retryWrites=true&w=majority&appName=Cluster0")
+
+client = AsyncMongoClient(MONGO_URI)
 db = client.college
 task_collection = db.get_collection("tasques")
 
@@ -86,18 +88,16 @@ async def show_task(id: str):
         return task
     raise HTTPException(status_code=404, detail=f"Tasca {id} no trobada")
 
-from fastapi import Body
-
 @app.put("/tasks/{task_id}")
 async def update_task(task_id: str, payload: dict = Body(...)):
-    # Añadimos 'await' antes de db.tasks...
-    result = await db.tasks.update_one(
+    # CORRECCIÓ: Fem servir 'task_collection' en lloc de 'db.tasks' per utilitzar la mateixa col·lecció ("tasques")
+    result = await task_collection.update_one(
         {"_id": ObjectId(task_id)},
         {"$set": payload}
     )
     if result.matched_count == 0:
-        return {"message": "No se encontró la tarea"}
-    return {"message": "Tarea actualizada correctamente"}
+        raise HTTPException(status_code=404, detail="No s'ha trobat la tasca")
+    return {"message": "Tasca actualitzada correctament"}
 
 @app.delete("/tasks/{id}")
 async def delete_task(id: str):
